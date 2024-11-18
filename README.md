@@ -2,7 +2,7 @@
 
 A browser-based tool that converts images to PDF with professional headers. Built with vanilla JavaScript and runs entirely in your browser - no server required!
 
-![image](https://github.com/user-attachments/assets/e664d222-d1f2-4876-9888-142bd68d94a0)
+![image](https://github.com/user-attachments/assets/5f9fea4d-b60c-41ca-974d-958ff21f4d7f)
 
 
 ## Features
@@ -23,7 +23,7 @@ Visit [IMAGESTACKER](https://bigspice.github.io/IMAGESTACKER) to try it out!
 
 ### 1. Upload Images
 
-![image](https://github.com/user-attachments/assets/5c094c3f-4482-42f8-b6da-10432dcdf3c0)
+![image](https://github.com/user-attachments/assets/beb0b7ec-456a-427a-9628-3a1a1aa629a0)
 
 Two ways to upload:
 - Drag and drop images directly onto the drop zone
@@ -31,7 +31,7 @@ Two ways to upload:
 
 ### 2. Preview
 
-![image](https://github.com/user-attachments/assets/1edea6d4-0b5c-47ba-947e-76c73b057fc8)
+![image](https://github.com/user-attachments/assets/ce17781a-6266-4bd0-8b54-c6488cf90f94)
 
 - View thumbnails of selected images
 - Remove unwanted images by clicking the 'X' button
