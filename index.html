@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to PDF Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            background-color: #fafafa;
+            transition: border-color 0.3s ease;
+        }
+
+        .drop-zone.dragover {
+            border-color: #000;
+            background-color: #f0f0f0;
+        }
+
+        .preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .preview-item {
+            position: relative;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: auto;
+            border-radius: 2px;
+        }
+
+        .preview-item .remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: red;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #45a049;
+        }
+
+        .btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .filename-input {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .progress {
+            width: 0%;
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
+        }
+
+        .error-message {
+            color: red;
+            margin: 10px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image to PDF Converter</h1>
+        
+        <div class="drop-zone" id="dropZone">
+            <p>Drag and drop images here or</p>
+            <input type="file" id="fileInput" multiple accept="image/*" style="display: none">
+            <button class="btn" onclick="document.getElementById('fileInput').click()">Select Files</button>
+        </div>
+
+        <div class="preview-container" id="previewContainer"></div>
+
+        <input type="text" class="filename-input" id="pdfFilename" placeholder="Enter PDF filename (without extension)" value="converted_images">
+
+        <div class="progress-bar" id="progressBar">
+            <div class="progress" id="progress"></div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <button class="btn" id="convertBtn" onclick="convertToPDF()" disabled>Convert to PDF</button>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+
+        // Drag and drop functionality
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const convertBtn = document.getElementById('convertBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progress = document.getElementById('progress');
+        const errorMessage = document.getElementById('errorMessage');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            files.forEach(file => {
+                if (!selectedFiles.some(f => f.name === file.name)) {
+                    selectedFiles.push(file);
+                    createPreviewItem(file);
+                }
+            });
+            updateConvertButton();
+        }
+
+        function createPreviewItem(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item';
+                
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-btn';
+                removeBtn.innerHTML = '×';
+                removeBtn.onclick = () => {
+                    selectedFiles = selectedFiles.filter(f => f !== file);
+                    previewItem.remove();
+                    updateConvertButton();
+                };
+                
+                previewItem.appendChild(img);
+                previewItem.appendChild(removeBtn);
+                previewContainer.appendChild(previewItem);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateConvertButton() {
+            convertBtn.disabled = selectedFiles.length === 0;
+        }
+
+        async function convertToPDF() {
+            try {
+                progressBar.style.display = 'block';
+                errorMessage.style.display = 'none';
+                convertBtn.disabled = true;
+
+                const PDFLib = window.PDFLib;
+                const pdf = await PDFLib.PDFDocument.create();
+                
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    const file = selectedFiles[i];
+                    const imageData = await readFileAsArrayBuffer(file);
+                    
+                    // Update progress
+                    progress.style.width = `${((i + 1) / selectedFiles.length) * 100}%`;
+
+                    let image;
+                    if (file.type === 'image/jpeg') {
+                        image = await pdf.embedJpg(imageData);
+                    } else if (file.type === 'image/png') {
+                        image = await pdf.embedPng(imageData);
+                    }
+
+                    const page = pdf.addPage([595.276, 841.890]); // A4 size in points
+                    const { width, height } = page.getSize();
+                    
+                    // Calculate optimal scaling
+                    const imgAspectRatio = image.width / image.height;
+                    const pageAspectRatio = width / height;
+                    
+                    let scaledWidth, scaledHeight;
+                    if (imgAspectRatio > pageAspectRatio) {
+                        scaledWidth = width - 40;
+                        scaledHeight = scaledWidth / imgAspectRatio;
+                    } else {
+                        scaledHeight = height - 80; // Leave room for header
+                        scaledWidth = scaledHeight * imgAspectRatio;
+                    }
+
+                    // Draw black header
+                    page.drawRectangle({
+                        x: (width - scaledWidth) / 2,
+                        y: height - ((height - scaledHeight) / 2),
+                        width: scaledWidth,
+                        height: 40,
+                        color: PDFLib.rgb(0, 0, 0),
+                    });
+
+                    // Draw filename
+                    const fileName = file.name.split('.').slice(0, -1).join('.');
+                    page.drawText(fileName, {
+                        x: (width - scaledWidth) / 2 + 10,
+                        y: height - ((height - scaledHeight) / 2) + 15,
+                        size: 12,
+                        color: PDFLib.rgb(1, 1, 1),
+                    });
+
+                    // Draw "MARKED" text
+                    page.drawText('MARKED', {
+                        x: (width + scaledWidth) / 2 - 30,
+                        y: height - ((height - scaledHeight) / 2) + 25,
+                        size: 5,
+                        color: PDFLib.rgb(1, 1, 1),
+                    });
+
+                    // Draw image
+                    page.drawImage(image, {
+                        x: (width - scaledWidth) / 2,
+                        y: height - ((height - scaledHeight) / 2) - scaledHeight,
+                        width: scaledWidth,
+                        height: scaledHeight,
+                    });
+                }
+
+                const pdfBytes = await pdf.save();
+                const filename = document.getElementById('pdfFilename').value || 'converted_images';
+                saveAs(new Blob([pdfBytes], { type: 'application/pdf' }), `${filename}.pdf`);
+                
+                progressBar.style.display = 'none';
+                progress.style.width = '0%';
+                convertBtn.disabled = false;
+            } catch (error) {
+                console.error('Error converting to PDF:', error);
+                errorMessage.textContent = 'Error converting images to PDF. Please try again.';
+                errorMessage.style.display = 'block';
+                progressBar.style.display = 'none';
+                convertBtn.disabled = false;
+            }
+        }
+
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+    </script>
+</body>
+</html>
