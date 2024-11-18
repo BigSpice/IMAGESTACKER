@@ -115,12 +115,6 @@ Tested and working on:
 2. Make changes to `index.html`
 3. Refresh browser to see changes
 
-No build process required!
-
-- PDF-Lib team for the excellent PDF generation library
-- FileSaver.js for simplified file downloading
-- Anthropic for the inspiration
-
 ## Support
 
 If you encounter any issues or have questions:
