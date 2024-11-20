@@ -121,35 +121,51 @@
                 this.setupEventListeners();
             }
 
-            setupEventListeners() {
-                const dropZone = document.getElementById('drop-zone');
-                const fileInput = document.getElementById('file-input');
-                const convertBtn = document.getElementById('convert-btn');
-                const imageList = document.getElementById('image-list');
+             setupEventListeners() {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const convertBtn = document.getElementById('convert-btn');
+        const imageList = document.getElementById('image-list');
 
-                // Prevent default drag behaviors
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    dropZone.addEventListener(eventName, this.preventDefaults, false);
-                });
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, this.preventDefaults, false);
+        });
 
-                // Event listeners
-                dropZone.addEventListener('drop', this.handleDrop.bind(this), false);
-                dropZone.addEventListener('click', () => fileInput.click(), false);
-                fileInput.addEventListener('change', this.handleFileSelect.bind(this), false);
-                convertBtn.addEventListener('click', this.convertToPDF.bind(this), false);
+        dropZone.addEventListener('drop', this.handleDrop.bind(this), false);
+        dropZone.addEventListener('click', () => fileInput.click(), false);
+        fileInput.addEventListener('change', this.handleFileSelect.bind(this), false);
+        convertBtn.addEventListener('click', this.convertToPDF.bind(this), false);
 
-                // Sortable initialization
-                Sortable.create(imageList, {
-                    animation: 150,
-                    onEnd: (evt) => {
-                        // Reorder images based on the new DOM order
-                        const newOrder = Array.from(imageList.children).map(item => 
-                            this.images[Array.from(imageList.children).indexOf(item)]
-                        );
-                        this.images = newOrder;
+        // Improved Sortable configuration
+        this.sortable = Sortable.create(imageList, {
+            animation: 150,
+            onEnd: (evt) => {
+                console.log('Drag ended. Reordering images...');
+                
+                // Create a new array to store the reordered images
+                const newImages = [];
+                
+                // Iterate through the DOM children to maintain the new order
+                const imageContainers = imageList.children;
+                for (let container of imageContainers) {
+                    // Find the image in the original array that matches this container
+                    const img = this.images.find(imgObj => 
+                        container.querySelector('.filename').textContent === imgObj.name
+                    );
+                    
+                    if (img) {
+                        newImages.push(img);
                     }
-                });
+                }
+                
+                // Replace the images array with the new order
+                this.images = newImages;
+                
+                // Log the new order for verification
+                console.log('New images order:', this.images.map(img => img.name));
             }
+        });
+    }
 
             preventDefaults(e) {
                 e.preventDefault();
