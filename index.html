@@ -211,48 +211,54 @@
                 convertBtn.disabled = this.images.length === 0;
             }
 
-            async convertToPDF() {
-                const progressBar = document.getElementById('progress-bar');
-                const doc = new jsPDF();
+       async convertToPDF() {
+    // Debug: Log the current order of images before conversion
+    console.log("Images order before conversion:", this.images.map(img => img.name));
+
+    const progressBar = document.getElementById('progress-bar');
+    const doc = new jsPDF();
+    
+    for (let [index, img] of this.images.entries()) {
+        // Debug: Log each image being processed
+        console.log(`Processing image ${index}:`, img.name);
+
+        const image = new Image();
+        image.src = img.src;
+        
+        await new Promise(resolve => {
+            image.onload = () => {
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const imgWidth = image.width;
+                const imgHeight = image.height;
                 
-                for (let [index, img] of this.images.entries()) {
-                    const image = new Image();
-                    image.src = img.src;
-                    
-                    await new Promise(resolve => {
-                        image.onload = () => {
-                            const pageWidth = doc.internal.pageSize.getWidth();
-                            const pageHeight = doc.internal.pageSize.getHeight();
-                            const imgWidth = image.width;
-                            const imgHeight = image.height;
-                            
-                            let width = pageWidth;
-                            let height = (imgHeight / imgWidth) * width;
-                            
-                            if (height > pageHeight) {
-                                height = pageHeight;
-                                width = (imgWidth / imgHeight) * height;
-                            }
-                            
-                            const x = (pageWidth - width) / 2;
-                            const y = (pageHeight - height) / 2;
-                            
-                            if (index > 0) {
-                                doc.addPage();
-                            }
-                            
-                            doc.addImage(img.src, 'JPEG', x, y, width, height);
-                            
-                            progressBar.style.width = `${((index + 1) / this.images.length) * 100}%`;
-                            
-                            resolve();
-                        };
-                    });
+                let width = pageWidth;
+                let height = (imgHeight / imgWidth) * width;
+                
+                if (height > pageHeight) {
+                    height = pageHeight;
+                    width = (imgWidth / imgHeight) * height;
                 }
                 
-                doc.save('merged.pdf');
-                progressBar.style.width = '0%';
-            }
+                const x = (pageWidth - width) / 2;
+                const y = (pageHeight - height) / 2;
+                
+                if (index > 0) {
+                    doc.addPage();
+                }
+                
+                doc.addImage(img.src, 'JPEG', x, y, width, height);
+                
+                progressBar.style.width = `${((index + 1) / this.images.length) * 100}%`;
+                
+                resolve();
+            };
+        });
+    }
+    
+    doc.save('merged.pdf');
+    progressBar.style.width = '0%';
+}
         }
 
         const pdfMerger = new PDFMerger();
