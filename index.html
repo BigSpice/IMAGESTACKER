@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Image to PDF Merger</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.4.0/pdf-lib.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
             background-color: #1a1a1a;
@@ -20,16 +18,12 @@
             background-color: #2c2c2c;
             border-radius: 10px;
             padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .drop-zone {
             border: 2px dashed #444;
             padding: 20px;
             text-align: center;
             cursor: pointer;
-        }
-        .drop-zone-active {
-            background-color: rgba(76, 175, 80, 0.1);
         }
         .image-list {
             display: flex;
@@ -67,154 +61,155 @@
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="app">
+        <div class="app-container">
+            <h1>Image to PDF Merger</h1>
+            <div id="drop-zone" class="drop-zone">
+                <input type="file" id="file-input" multiple accept="image/*" style="display:none;">
+                <p>Drag and drop images here or click to upload</p>
+            </div>
+            <div id="image-list" class="image-list"></div>
+            <button id="convert-btn" disabled>Convert to PDF</button>
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+    </div>
+
     <script>
-        const { useState, useRef } = React;
-        const { PDFDocument } = window.PDFLib;
+        const { jsPDF } = window.jspdf;
 
-        function App() {
-            const [images, setImages] = useState([]);
-            const [progress, setProgress] = useState(0);
-            const fileInputRef = useRef(null);
+        class PDFMerger {
+            constructor() {
+                this.images = [];
+                this.setupEventListeners();
+            }
 
-            const handleFileUpload = async (event) => {
-                const files = event.target.files ? Array.from(event.target.files) : 
-                               event.dataTransfer ? Array.from(event.dataTransfer.files) : [];
-                
-                const newImages = await Promise.all(
-                    files.filter(file => file.type.startsWith('image/'))
-                        .map(async (file) => ({
-                            file,
-                            url: await readFileAsDataURL(file),
-                            id: Date.now() + Math.random().toString()
-                        }))
-                );
-                
-                setImages(prev => [...prev, ...newImages]);
-            };
+            setupEventListeners() {
+                const dropZone = document.getElementById('drop-zone');
+                const fileInput = document.getElementById('file-input');
+                const convertBtn = document.getElementById('convert-btn');
 
-            const readFileAsDataURL = (file) => {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
+                // Drag and drop events
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, this.preventDefaults, false);
                 });
-            };
 
-            const convertToPDF = async () => {
-                const pdfDoc = await PDFDocument.create();
+                dropZone.addEventListener('drop', this.handleDrop.bind(this), false);
+                dropZone.addEventListener('click', () => fileInput.click(), false);
+                fileInput.addEventListener('change', this.handleFileSelect.bind(this), false);
+                convertBtn.addEventListener('click', this.convertToPDF.bind(this), false);
+            }
+
+            preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            handleDrop(e) {
+                this.preventDefaults(e);
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                this.processFiles(files);
+            }
+
+            handleFileSelect(e) {
+                const files = e.target.files;
+                this.processFiles(files);
+            }
+
+            processFiles(files) {
+                const imageList = document.getElementById('image-list');
+                const convertBtn = document.getElementById('convert-btn');
+
+                Array.from(files)
+                    .filter(file => file.type.startsWith('image/'))
+                    .forEach(file => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const img = document.createElement('div');
+                            img.className = 'image-item';
+                            img.innerHTML = `
+                                <img src="${e.target.result}" class="image-thumbnail">
+                                <button class="remove-btn" onclick="app.removeImage(this)">X</button>
+                            `;
+                            imageList.appendChild(img);
+                            
+                            this.images.push({
+                                src: e.target.result,
+                                file: file
+                            });
+
+                            convertBtn.disabled = false;
+                        };
+                        reader.readAsDataURL(file);
+                    });
+            }
+
+            removeImage(btn) {
+                const imageItem = btn.closest('.image-item');
+                const index = Array.from(imageItem.parentNode.children).indexOf(imageItem);
                 
-                for (let [index, image] of images.entries()) {
-                    try {
-                        const imgBytes = await fetch(image.url).then(res => res.arrayBuffer());
-                        const img = await pdfDoc.embedImage(imgBytes);
-                        const page = pdfDoc.addPage([img.width, img.height]);
-                        page.drawImage(img, {
-                            x: 0,
-                            y: 0,
-                            width: img.width,
-                            height: img.height
-                        });
-                        setProgress(((index + 1) / images.length) * 100);
-                    } catch (error) {
-                        console.error(`Error processing image ${index}:`, error);
-                    }
+                imageItem.remove();
+                this.images.splice(index, 1);
+
+                const convertBtn = document.getElementById('convert-btn');
+                convertBtn.disabled = this.images.length === 0;
+            }
+
+            async convertToPDF() {
+                const progressBar = document.getElementById('progress-bar');
+                const doc = new jsPDF();
+                
+                for (let [index, img] of this.images.entries()) {
+                    // Create image element to get natural dimensions
+                    const image = new Image();
+                    image.src = img.src;
+                    
+                    await new Promise(resolve => {
+                        image.onload = () => {
+                            // Calculate scaling to fit page
+                            const pageWidth = doc.internal.pageSize.getWidth();
+                            const pageHeight = doc.internal.pageSize.getHeight();
+                            const imgWidth = image.width;
+                            const imgHeight = image.height;
+                            
+                            let width = pageWidth;
+                            let height = (imgHeight / imgWidth) * width;
+                            
+                            // If height is too large, scale by height
+                            if (height > pageHeight) {
+                                height = pageHeight;
+                                width = (imgWidth / imgHeight) * height;
+                            }
+                            
+                            // Center the image
+                            const x = (pageWidth - width) / 2;
+                            const y = (pageHeight - height) / 2;
+                            
+                            // Add page if not first image
+                            if (index > 0) {
+                                doc.addPage();
+                            }
+                            
+                            // Add image to PDF
+                            doc.addImage(img.src, 'JPEG', x, y, width, height);
+                            
+                            // Update progress
+                            progressBar.style.width = `${((index + 1) / this.images.length) * 100}%`;
+                            
+                            resolve();
+                        };
+                    });
                 }
-
-                const pdfBytes = await pdfDoc.save();
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = 'merged.pdf';
-                link.click();
-                setProgress(0);
-            };
-
-            const removeImage = (id) => {
-                setImages(prev => prev.filter(img => img.id !== id));
-            };
-
-            const handleDragOver = (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-            };
-
-            const handleDrop = (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                handleFileUpload(event);
-            };
-
-            return React.createElement('div', { className: 'app-container' }, [
-                React.createElement('h1', { key: 'title' }, 'Image to PDF Merger'),
-                React.createElement('div', {
-                    key: 'drop-zone',
-                    className: 'drop-zone',
-                    onClick: () => fileInputRef.current.click(),
-                    onDragOver: handleDragOver,
-                    onDrop: handleDrop
-                }, [
-                    React.createElement('input', {
-                        key: 'file-input',
-                        type: 'file',
-                        multiple: true,
-                        accept: 'image/*',
-                        onChange: handleFileUpload,
-                        ref: fileInputRef,
-                        style: { display: 'none' }
-                    }),
-                    React.createElement('p', { key: 'drop-text' }, 
-                        'Drag and drop images here or click to upload'
-                    )
-                ]),
-                React.createElement('div', { 
-                    key: 'image-list', 
-                    className: 'image-list' 
-                }, 
-                    images.map((img) => 
-                        React.createElement('div', { 
-                            key: img.id, 
-                            className: 'image-item' 
-                        }, [
-                            React.createElement('img', {
-                                src: img.url,
-                                className: 'image-thumbnail'
-                            }),
-                            React.createElement('button', {
-                                className: 'remove-btn',
-                                onClick: () => removeImage(img.id)
-                            }, 'X')
-                        ])
-                    )
-                ),
-                React.createElement('button', {
-                    key: 'convert-btn',
-                    onClick: convertToPDF,
-                    disabled: images.length === 0,
-                    style: {
-                        backgroundColor: images.length > 0 ? '#4CAF50' : '#777',
-                        color: 'white',
-                        border: 'none',
-                        padding: '10px 20px',
-                        borderRadius: '5px',
-                        cursor: images.length > 0 ? 'pointer' : 'not-allowed'
-                    }
-                }, 'Convert to PDF'),
-                React.createElement('div', {
-                    key: 'progress-container',
-                    style: { width: '100%', backgroundColor: '#333', height: '5px', marginTop: '10px' }
-                }, [
-                    React.createElement('div', {
-                        key: 'progress-bar',
-                        className: 'progress-bar',
-                        style: { width: `${progress}%` }
-                    })
-                ])
-            ]);
+                
+                // Save PDF
+                doc.save('merged.pdf');
+                progressBar.style.width = '0%';
+            }
         }
 
-        ReactDOM.render(React.createElement(App), document.getElementById('root'));
+        // Initialize the app
+        const app = new PDFMerger();
+        window.app = app;
     </script>
 </body>
 </html>
