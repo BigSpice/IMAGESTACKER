@@ -116,37 +116,40 @@
         const { jsPDF } = window.jspdf;
 
         class PDFMerger {
-          constructor() {
-        this.images = [];
-        this.setupEventListeners();
-    }
-
-    setupEventListeners() {
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const convertBtn = document.getElementById('convert-btn');
-        const imageList = document.getElementById('image-list');
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, this.preventDefaults, false);
-        });
-
-        dropZone.addEventListener('drop', this.handleDrop.bind(this), false);
-        dropZone.addEventListener('click', () => fileInput.click(), false);
-        fileInput.addEventListener('change', this.handleFileSelect.bind(this), false);
-        convertBtn.addEventListener('click', this.convertToPDF.bind(this), false);
-
-        Sortable.create(imageList, {
-            animation: 150,
-            onEnd: (evt) => {
-                // Reorder images based on the new DOM order
-                const newOrder = Array.from(imageList.children).map(item => 
-                    this.images[Array.from(imageList.children).indexOf(item)]
-                );
-                this.images = newOrder;
+            constructor() {
+                this.images = [];
+                this.setupEventListeners();
             }
-        });
-    }
+
+            setupEventListeners() {
+                const dropZone = document.getElementById('drop-zone');
+                const fileInput = document.getElementById('file-input');
+                const convertBtn = document.getElementById('convert-btn');
+                const imageList = document.getElementById('image-list');
+
+                // Prevent default drag behaviors
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, this.preventDefaults, false);
+                });
+
+                // Event listeners
+                dropZone.addEventListener('drop', this.handleDrop.bind(this), false);
+                dropZone.addEventListener('click', () => fileInput.click(), false);
+                fileInput.addEventListener('change', this.handleFileSelect.bind(this), false);
+                convertBtn.addEventListener('click', this.convertToPDF.bind(this), false);
+
+                // Sortable initialization
+                Sortable.create(imageList, {
+                    animation: 150,
+                    onEnd: (evt) => {
+                        // Reorder images based on the new DOM order
+                        const newOrder = Array.from(imageList.children).map(item => 
+                            this.images[Array.from(imageList.children).indexOf(item)]
+                        );
+                        this.images = newOrder;
+                    }
+                });
+            }
 
             preventDefaults(e) {
                 e.preventDefault();
@@ -179,7 +182,7 @@
                             container.innerHTML = `
                                 <div class="image-item">
                                     <img src="${e.target.result}" class="image-thumbnail">
-                                    <button class="remove-btn" onclick="app.removeImage(this)">X</button>
+                                    <button class="remove-btn" onclick="pdfMerger.removeImage(this)">X</button>
                                 </div>
                                 <div class="filename">${file.name}</div>
                             `;
@@ -208,49 +211,52 @@
                 convertBtn.disabled = this.images.length === 0;
             }
 
-           async convertToPDF() {
-        const progressBar = document.getElementById('progress-bar');
-        const doc = new jsPDF();
-        
-        for (let [index, img] of this.images.entries()) {
-            const image = new Image();
-            image.src = img.src;
-            
-            await new Promise(resolve => {
-                image.onload = () => {
-                    const pageWidth = doc.internal.pageSize.getWidth();
-                    const pageHeight = doc.internal.pageSize.getHeight();
-                    const imgWidth = image.width;
-                    const imgHeight = image.height;
+            async convertToPDF() {
+                const progressBar = document.getElementById('progress-bar');
+                const doc = new jsPDF();
+                
+                for (let [index, img] of this.images.entries()) {
+                    const image = new Image();
+                    image.src = img.src;
                     
-                    let width = pageWidth;
-                    let height = (imgHeight / imgWidth) * width;
-                    
-                    if (height > pageHeight) {
-                        height = pageHeight;
-                        width = (imgWidth / imgHeight) * height;
-                    }
-                    
-                    const x = (pageWidth - width) / 2;
-                    const y = (pageHeight - height) / 2;
-                    
-                    if (index > 0) {
-                        doc.addPage();
-                    }
-                    
-                    doc.addImage(img.src, 'JPEG', x, y, width, height);
-                    
-                    progressBar.style.width = `${((index + 1) / this.images.length) * 100}%`;
-                    
-                    resolve();
-                };
-            });
+                    await new Promise(resolve => {
+                        image.onload = () => {
+                            const pageWidth = doc.internal.pageSize.getWidth();
+                            const pageHeight = doc.internal.pageSize.getHeight();
+                            const imgWidth = image.width;
+                            const imgHeight = image.height;
+                            
+                            let width = pageWidth;
+                            let height = (imgHeight / imgWidth) * width;
+                            
+                            if (height > pageHeight) {
+                                height = pageHeight;
+                                width = (imgWidth / imgHeight) * height;
+                            }
+                            
+                            const x = (pageWidth - width) / 2;
+                            const y = (pageHeight - height) / 2;
+                            
+                            if (index > 0) {
+                                doc.addPage();
+                            }
+                            
+                            doc.addImage(img.src, 'JPEG', x, y, width, height);
+                            
+                            progressBar.style.width = `${((index + 1) / this.images.length) * 100}%`;
+                            
+                            resolve();
+                        };
+                    });
+                }
+                
+                doc.save('merged.pdf');
+                progressBar.style.width = '0%';
+            }
         }
-        
-        doc.save('merged.pdf');
-        progressBar.style.width = '0%';
-    }
-}
 
-const app = new PDFMerger();
-window.app = app;
+        const pdfMerger = new PDFMerger();
+        window.pdfMerger = pdfMerger;
+    </script>
+</body>
+</html>
